@@ -1,0 +1,6 @@
+# Git attributes documentation: https://git-scm.com/docs/gitattributes
+# Normalize text files and check them out with LF line endings.
+* text=auto eol=lf
+# Windows command scripts require CRLF line endings.
+*.bat text eol=crlf
+*.cmd text eol=crlf

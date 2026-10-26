@@ -1,0 +1,16 @@
+# EditorConfig specification: https://editorconfig.org/
+root = true
+
+[*]
+# Keep source files on LF, add a final newline, and remove accidental trailing whitespace.
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Windows command scripts require CRLF line endings.
+[*.{bat,cmd}]
+end_of_line = crlf
+
+# Markdown uses trailing spaces for intentional hard line breaks.
+[*.md]
+trim_trailing_whitespace = false
