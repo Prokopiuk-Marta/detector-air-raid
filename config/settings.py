@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "corsheaders",
+    "monitoring.apps.MonitoringConfig",
 ]
 
 MIDDLEWARE = [
@@ -111,9 +112,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.1/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "uk"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "Europe/Kyiv"
 
 USE_I18N = True
 
@@ -133,4 +134,8 @@ MAILERS = {
     "default": {
         "BACKEND": "django.core.mail.backends.console.EmailBackend",
     },
+}
+
+REST_FRAMEWORK = {
+    "EXCEPTION_HANDLER": "monitoring.exceptions.custom_exception_handler",
 }
