@@ -19,7 +19,7 @@ class CheckAdmin(admin.ModelAdmin):
 
 @admin.register(Alert)
 class AlertAdmin(admin.ModelAdmin):
-    list_display = ["started_at", "finished_at"]
+    list_display = ["started_at", "finished_at", "alert_type", "external_id"]
     date_hierarchy = "started_at"
 
 

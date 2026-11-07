@@ -40,6 +40,8 @@ class Check(models.Model):
 
 
 class Alert(models.Model):
+    external_id = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    alert_type = models.CharField(max_length=30, default="air_raid")
     started_at = models.DateTimeField()
     finished_at = models.DateTimeField(null=True, blank=True)
 
