@@ -40,8 +40,13 @@ class Check(models.Model):
 
 
 class Alert(models.Model):
+    LEVEL_CHOICES = [
+        ("yellow", "Жовтий"),
+        ("red", "Червоний"),
+    ]
     external_id = models.CharField(max_length=50, unique=True, null=True, blank=True)
     alert_type = models.CharField(max_length=30, default="air_raid")
+    alert_level = models.CharField(max_length=10, choices=LEVEL_CHOICES, default="red")
     started_at = models.DateTimeField()
     finished_at = models.DateTimeField(null=True, blank=True)
 
