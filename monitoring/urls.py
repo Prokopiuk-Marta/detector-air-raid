@@ -1,4 +1,5 @@
 from django.urls import path
+
 from . import views
 
 urlpatterns = [
@@ -7,6 +8,11 @@ urlpatterns = [
         "services/<slug:slug>/",
         views.ServiceDetailView.as_view(),
         name="service-detail",
+    ),
+    path(
+        "services/<slug:slug>/timeline/",
+        views.ServiceTimelineView.as_view(),
+        name="service-timeline",
     ),
     path("outages/", views.PowerOutageListView.as_view(), name="outage-list"),
     path(
@@ -20,4 +26,5 @@ urlpatterns = [
         views.IncidentDetailView.as_view(),
         name="incident-detail",
     ),
+    path("alerts/", views.AlertListView.as_view(), name="alert-list"),
 ]

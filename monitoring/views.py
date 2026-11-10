@@ -1,14 +1,21 @@
+from datetime import timedelta
+
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .exceptions import ConflictError
-from .models import Incident, PowerOutage, Service
-from .serializers import IncidentSerializer, PowerOutageSerializer, ServiceSerializer
+from .models import Alert, Incident, PowerOutage, Service
+from .serializers import (
+    AlertSerializer,
+    IncidentSerializer,
+    PowerOutageSerializer,
+    ServiceSerializer,
+)
 
 
 class StandardPagination(PageNumberPagination):
@@ -171,3 +178,76 @@ class IncidentDetailView(APIView):
         incident = self.get_object(pk)
         incident.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ---------- Тривоги ----------
+
+
+class AlertListView(APIView):
+    def get(self, request):
+        alerts = Alert.objects.all()
+
+        if request.query_params.get("active") == "true":
+            alerts = alerts.filter(finished_at__isnull=True)
+
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(alerts, request, view=self)
+        serializer = AlertSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+
+# ---------- Дані для графіка статистики ----------
+
+TIMELINE_DAYS = {1, 7, 30}
+
+
+class ServiceTimelineView(APIView):
+    def get(self, request, slug):
+        try:
+            service = Service.objects.get(slug=slug)
+        except Service.DoesNotExist:
+            raise NotFound(f"Сервіс '{slug}' не знайдено.")
+
+        try:
+            days = int(request.query_params.get("days", 7))
+        except ValueError:
+            days = None
+        if days not in TIMELINE_DAYS:
+            raise ValidationError({"days": ["Допустимі значення: 1, 7 або 30."]})
+
+        period_end = timezone.now()
+        period_start = period_end - timedelta(days=days)
+
+        checks = service.checks.filter(checked_at__gte=period_start).order_by(
+            "checked_at"
+        )
+        overlaps = Q(started_at__lt=period_end) & (
+            Q(finished_at__gt=period_start) | Q(finished_at__isnull=True)
+        )
+        alerts = Alert.objects.filter(overlaps).order_by("started_at")
+        outages = PowerOutage.objects.filter(
+            started_at__lt=period_end, finished_at__gt=period_start
+        ).order_by("started_at")
+        incidents = service.incidents.filter(
+            Q(started_at__lt=period_end)
+            & (Q(resolved_at__gt=period_start) | Q(resolved_at__isnull=True))
+        ).order_by("started_at")
+
+        return Response(
+            {
+                "service": {"slug": service.slug, "name": service.name},
+                "from": period_start,
+                "to": period_end,
+                "checks": [
+                    {
+                        "checked_at": check.checked_at,
+                        "is_up": check.is_up,
+                        "response_time_ms": check.response_time_ms,
+                    }
+                    for check in checks
+                ],
+                "alerts": AlertSerializer(alerts, many=True).data,
+                "outages": PowerOutageSerializer(outages, many=True).data,
+                "incidents": IncidentSerializer(incidents, many=True).data,
+            }
+        )
