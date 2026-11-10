@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 
 from .exceptions import ConflictError
 from .models import Alert, Incident, PowerOutage, Service
+from .permissions import IsAdminOrReadOnly
 from .serializers import (
     AlertSerializer,
     IncidentSerializer,
@@ -23,6 +24,8 @@ class StandardPagination(PageNumberPagination):
 
 
 class ServiceListView(APIView):
+    permission_classes = [IsAdminOrReadOnly]
+
     def get(self, request):
         services = Service.objects.all()
         serializer = ServiceSerializer(services, many=True)
@@ -36,6 +39,8 @@ class ServiceListView(APIView):
 
 
 class ServiceDetailView(APIView):
+    permission_classes = [IsAdminOrReadOnly]
+
     def get_object(self, slug):
         try:
             return Service.objects.get(slug=slug)
@@ -78,6 +83,8 @@ class ServiceDetailView(APIView):
 
 
 class PowerOutageListView(APIView):
+    permission_classes = [IsAdminOrReadOnly]
+
     def get(self, request):
         outages = PowerOutage.objects.all()
 
@@ -102,6 +109,8 @@ class PowerOutageListView(APIView):
 
 
 class PowerOutageDetailView(APIView):
+    permission_classes = [IsAdminOrReadOnly]
+
     def get_object(self, pk):
         try:
             return PowerOutage.objects.get(pk=pk)
@@ -127,6 +136,8 @@ class PowerOutageDetailView(APIView):
 
 
 class IncidentListView(APIView):
+    permission_classes = [IsAdminOrReadOnly]
+
     def get(self, request):
         incidents = Incident.objects.all()
 
@@ -156,6 +167,8 @@ class IncidentListView(APIView):
 
 
 class IncidentDetailView(APIView):
+    permission_classes = [IsAdminOrReadOnly]
+
     def get_object(self, pk):
         try:
             return Incident.objects.get(pk=pk)

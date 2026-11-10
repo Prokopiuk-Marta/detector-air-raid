@@ -1,4 +1,5 @@
 from django.contrib import admin
+
 from .models import Alert, Check, Incident, PowerOutage, Service
 
 
