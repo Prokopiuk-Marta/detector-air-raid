@@ -1,122 +1,379 @@
-# web-programming-2026-template
+# Detector bro
 
-A reusable Django project with no bundled application, SQLite, and Django's
-standard admin, authentication, sessions, messages, and staticfiles support.
+> Як працюють **Дія**, **Укрзалізниця**, **monobank**, **Приват24**, **ДМС НаУКМА** та інші важливі сервіси (як розширення в майбутньому)
+> під час повітряних тривог і відключень світла в Києві. А саме — чи залежить відповідь цих
+> сервісів від тривог, відключень чи інших атак. Можливо, знайдемо слабкі години, які не залежать
+> від згаданих факторів, а пов'язані з іншою проблемою.
 
-## Local setup
 
-Requires the latest patch release of Python 3.12, 3.13, or 3.14. Run these commands from the project directory containing
-`manage.py`.
+## Команда
 
-1. Create and activate a virtual environment:
+- Софія Баніт
+- Марта Прокоп'юк
+- Віра Яковлева
+
+## Опис
+
+Коли не відкривається Дія чи банк, виникає питання: «це в мене інтернет, чи сервіс лежить у всіх?».
+А під час повітряних тривог і відключень світла частина сервісів справді працює повільніше або
+недоступна (чи можливо ці факти не впливають - наше дослідження).
+
+**Detector bro** постійно перевіряє популярні українські онлайн-сервіси, збирає дані про
+тривоги, відключення світла та інциденти в Києві й показує, як усе це впливає на роботу сервісів.
+
+**Для кого:** для звичайних користувачів, яким треба швидко зрозуміти, чи працює сервіс, і для
+всіх, кому цікаво, як українська цифрова інфраструктура витримує воєнні умови.
+
+## Ролі
+
+- **Гість** (без входу): дивиться, чи працюють сервіси, поточну тривогу, відключення світла,
+  інциденти та статистику.
+- **Користувач** (після входу): усе, що гість, а також подає заявку «у мене немає світла»
+  (зі своєю групою відключень) і бачить історію своїх заявок.
+- **Адміністратор**: має доступ до всього — керує сервісами, інцидентами, відключеннями,
+  розглядає заявки користувачів і керує користувачами.
+
+## Основний функціонал
+
+- **Стан сервісів зараз:** працює / не працює, час відповіді, доступність за день, тиждень, місяць.
+- **Повітряні тривоги в Києві** з рівнем загрози: 🟡 жовтий (дрони) або 🔴 червоний (ракети,
+  масована атака), з часом початку й тривалістю.
+- **Відключення світла** за групами (черги `1.1`–`6.2`).
+- **Інциденти** — відомі збої сервісів із джерелом (новина, канал).
+- **Статистика та діаграми з фільтрами:** за періодом, сервісом, рівнем тривоги, групою світла;
+  порівняння роботи сервісів під час тривог і без них; у які години найчастіше збої.
+- **Заявки користувачів** про відсутність світла.
+- **Реєстрація та вхід** (JWT).
+
+## Особливість проєкту
+
+- **Інтеграція зі стороннім API:** тривоги в реальному часі з [alerts.in.ua](https://alerts.in.ua/).
+- **Автоматичний моніторинг:** сервер сам регулярно перевіряє доступність і швидкість сервісів.
+- **Збір даних з публічних Telegram-каналів** (не бот): інциденти та графіки відключень за
+  групами, які публікують відповідні канали( один канал = одна група).
+- **Аналітика**: чи працюють сервіси гірше під час тривог і
+  відключень.
+- **Фізичний брелок-індикатор:** плата Raspberry Pi Pico W  у корпусі,
+  надрукованому на 3D-принтері, звертається до нашого API і блимає, коли сервіс не відповідає
+  або в Києві тривога. 
+
+## Репозиторії
+
+- Бекенд (Django REST API): [Prokopiuk-Marta/detector-air-raid](https://github.com/Prokopiuk-Marta/detector-air-raid)
+- Фронтенд: [Prokopiuk-Marta/detector-air-raid-frontend](https://github.com/Prokopiuk-Marta/detector-air-raid-frontend)
+
+
+---
+
+# Бекенд
+
+## Зміст
+
+- [Звідки беруться дані](#звідки-беруться-дані)
+- [REST API](#rest-api)
+  - [Формат помилок](#формат-помилок)
+  - [Об'єкти у відповідях](#обєкти-у-відповідях)
+  - [Ендпоінти](#ендпоінти)
+  - [Бізнес-правила](#бізнес-правила)
+- [Схема бази даних](#схема-бази-даних)
+- [Як запустити проєкт](#як-запустити-проєкт)
+- [Збір даних](#збір-даних)
+- [Postman-колекція](#postman-колекція)
+
+---
+
+## Звідки беруться дані
+
+| Дані | Джерело |
+| --- | --- |
+| Перевірки сервісів | команда `check_services`: сервер сам надсилає запит на адресу кожного активного сервісу і зберігає статус-код та час відповіді |
+| Повітряні тривоги в Києві | команда `fetch_alerts`: API [alerts.in.ua](https://alerts.in.ua/), зберігаються початок, кінець, тип і рівень тривоги |
+| Відключення світла | публічні Telegram-канали груп відключень (TODO), заявки користувачів, ручне внесення адміністратором |
+| Інциденти | публічні джерела новин і Telegram-канали (TODO), ручне внесення адміністратором |
+
+---
+
+## REST API
+
+- Базова адреса: `/api/v1/`, дані у форматі JSON.
+- Автентифікація: **JWT**. Після входу клієнт отримує `access` і `refresh` токени й передає
+  access-токен у заголовку: `Authorization: Bearer <access>`.
+- Доступ: **усі**, **користувач** (потрібен вхід), **адмін** (`is_staff = true`).
+- Довгі списки повертаються сторінками по 20 (`?page=2`) у форматі
+  `{"count": 57, "next": "...", "previous": null, "results": [...]}`.
+- Загальні помилки: `400` (некоректні дані), `401` (немає токена), `403` (немає прав),
+  `404` (не знайдено), `409` (дія конфліктує з наявними даними).
+
+### Формат помилок
+
+Усі ендпоінти повертають помилки в **однаковому форматі**:
+
+```json
+{
+  "error": {
+    "status": 409,
+    "message": "Неможливо видалити сервіс 'Дія': для нього збережено 1240 перевірок. Щоб зупинити моніторинг, деактивуйте сервіс (is_active: false).",
+    "details": {}
+  }
+}
+```
+
+- `status` дублює HTTP-код;
+- `message` — зрозуміле пояснення, що пішло не так і що зробити;
+- `details` — подробиці. Для помилок валідації (`400`) тут перелік полів з помилками,
+  наприклад `{"url": ["Enter a valid URL."]}`; для решти помилок — порожній об'єкт.
+
+### Об'єкти у відповідях
+
+**Service**
+
+```json
+{
+  "id": 1,
+  "name": "Дія",
+  "slug": "diia",
+  "url": "https://diia.gov.ua",
+  "description": "Портал державних послуг",
+  "is_active": true,
+  "status": "up",
+  "response_time_ms": 340,
+  "uptime_7d": 99.42,
+  "last_checked_at": "2026-10-27T14:05:00+02:00"
+}
+```
+
+`status`: `up`, `down` або `unknown`. Сервіс вважається недоступним, якщо не відповів або
+повернув код `5xx`. Код `4xx` (наприклад, `403`, коли сайт блокує автоматичні запити) означає,
+що сервер працює.
+
+**Check**: `{"checked_at": "2026-10-27T14:05:00+02:00", "is_up": true, "status_code": 200, "response_time_ms": 340}`
+
+**Alert**
+
+```json
+{
+  "id": 812,
+  "alert_type": "air_raid",
+  "alert_level": "yellow",
+  "started_at": "2026-10-27T03:12:00+02:00",
+  "finished_at": null,
+  "duration_minutes": 37
+}
+```
+
+`alert_level`: `yellow` (загроза дронів) або `red` (ракетна чи масована загроза).
+`finished_at` порожній, поки тривога триває.
+
+**Outage**: `{"id": 55, "group": "3.1", "started_at": "2026-10-27T12:00:00+02:00", "finished_at": "2026-10-27T15:30:00+02:00"}`
+
+**Incident**
+
+```json
+{
+  "id": 4,
+  "title": "Збій платежів",
+  "description": "Не проходять оплати карткою.",
+  "started_at": "2026-10-20T09:15:00+02:00",
+  "resolved_at": null,
+  "source_url": "https://example.com/news/456",
+  "services": ["monobank", "privat24"]
+}
+```
+
+**PowerReport** (заявка «у мене немає світла»):
+`{"id": 31, "group": "3.1", "comment": "Немає світла з 18:00", "status": "new", "created_at": "2026-10-27T18:05:00+02:00"}`
+
+### Ендпоінти
+
+Колонка «Стан»: **готово** — реалізовано, **пізніше** — буде на наступних етапах.
+
+> Авторизації поки немає, тому позначка «адмін» зараз описує задумане право доступу,
+> а не перевірку. TODO: обмежити доступ після додавання JWT.
+
+#### Автентифікація та профіль
+
+| Метод і шлях | Для чого | Доступ | Запит | Відповідь | Стан |
+| --- | --- | --- | --- | --- | --- |
+| `POST /auth/register/` | Реєстрація | усі | `{"username", "email", "password"}` | `201` `{"id", "username", "email"}`; `400` | пізніше |
+| `POST /auth/token/` | Вхід, отримати JWT | усі | `{"username", "password"}` | `200` `{"access", "refresh"}`; `401` | пізніше |
+| `POST /auth/token/refresh/` | Оновити access-токен | усі | `{"refresh"}` | `200` `{"access"}`; `401` | пізніше |
+| `GET /profile/` | Мій профіль | користувач | — | `200` `{"id", "username", "email", "date_joined", "is_staff"}` | пізніше |
+| `PATCH /profile/` | Змінити email | користувач | `{"email"}` | `200` профіль | пізніше |
+
+#### Сервіси
+
+| Метод і шлях | Для чого | Доступ | Запит | Відповідь | Стан |
+| --- | --- | --- | --- | --- | --- |
+| `GET /services/` | Список сервісів | усі | — (TODO: `?status=`, `?ordering=`) | `200` масив Service | готово |
+| `GET /services/{slug}/` | Сторінка сервісу | усі | — | `200` Service; `404` (TODO: `"uptime": {"24h", "7d", "30d"}`) | готово |
+| `POST /services/` | Додати сервіс | адмін | `{"name", "slug", "url", "description", "is_active"}` | `201` Service; `400` | готово |
+| `PATCH /services/{slug}/` | Редагувати сервіс | адмін | будь-які поля з POST | `200` Service; `400`, `404` | готово |
+| `DELETE /services/{slug}/` | Видалити сервіс | адмін | — | `204`; `404`; `409` (є перевірки або інциденти) | готово |
+| `GET /services/{slug}/checks/` | Історія перевірок для графіка | усі | `?from=` `?to=` (дата) `?page=` | `200` сторінка Check; `404` | пізніше |
+| `GET /services/{slug}/stats/` | Статистика | усі | `?period=24h\|7d\|30d` `?alert_level=` `?group=` | `200` див. нижче; `404` | пізніше |
+
+Відповідь `GET /services/{slug}/stats/`:
+
+```json
+{
+  "period": "7d",
+  "uptime_percent": 99.42,
+  "avg_response_time_ms": 371,
+  "by_hour": [{"hour": 0, "uptime_percent": 100.0, "avg_response_time_ms": 310}],
+  "during_alerts": {"uptime_percent": 97.2, "avg_response_time_ms": 512},
+  "without_alerts": {"uptime_percent": 99.7, "avg_response_time_ms": 354}
+}
+```
+
+#### Тривоги та відключення світла
+
+| Метод і шлях | Для чого | Доступ | Запит | Відповідь | Стан |
+| --- | --- | --- | --- | --- | --- |
+| `GET /alerts/` | Історія тривог у Києві | усі | `?active=true` `?page=` (TODO: `?from=` `?to=` `?level=`) | `200` сторінка Alert | готово |
+| `GET /outages/` | Історія відключень | усі | `?group=3.1` `?active=true` `?page=` (TODO: `?from=` `?to=`) | `200` сторінка Outage | готово |
+| `GET /outages/{id}/` | Одне відключення | усі | — | `200` Outage; `404` | готово |
+| `POST /outages/` | Додати відключення | адмін | `{"group", "started_at", "finished_at"}` | `201` Outage; `400` | готово |
+| `PATCH /outages/{id}/` | Редагувати відключення | адмін | будь-які поля з POST | `200` Outage; `400`, `404` | готово |
+| `DELETE /outages/{id}/` | Видалити відключення | адмін | — | `204`; `404` | готово |
+
+> Тривоги через API тільки читаються: їх записує команда `fetch_alerts`.
+
+> **Захист від дублікатів відключень.** `POST` і `PATCH /outages/` повертають `400`, якщо:
+> 1. для цієї групи вже є відключення з таким самим `started_at` (унікальна пара
+>    `group` + `started_at` у базі даних);
+> 2. для цієї групи вже є відключення, яке **перетинається в часі** з новим
+>    (перевірка під час валідації).
+>
+> Приклад відповіді:
+> ```json
+> {"error": {"status": 400, "message": "Перевірте введені дані.", "details": {"non_field_errors": ["Для групи 3.1 у цей час уже є відключення (id 55). Змініть час або відредагуйте наявний запис."]}}}
+> ```
+
+#### Інциденти
+
+| Метод і шлях | Для чого | Доступ | Запит | Відповідь | Стан |
+| --- | --- | --- | --- | --- | --- |
+| `GET /incidents/` | Список інцидентів | усі | `?service=diia` `?active=true` `?search=` `?page=` | `200` сторінка Incident | готово |
+| `GET /incidents/{id}/` | Один інцидент | усі | — | `200` Incident; `404` | готово |
+| `POST /incidents/` | Додати інцидент | адмін | `{"title", "description", "started_at", "resolved_at", "source_url", "services"}` | `201` Incident; `400` | готово |
+| `PATCH /incidents/{id}/` | Редагувати інцидент | адмін | будь-які поля з POST | `200` Incident; `400`, `404` | готово |
+| `DELETE /incidents/{id}/` | Видалити інцидент | адмін | — | `204`; `404` | готово |
+
+#### Заявки про відсутність світла
+
+| Метод і шлях | Для чого | Доступ | Запит | Відповідь | Стан |
+| --- | --- | --- | --- | --- | --- |
+| `GET /power-reports/` | Мої заявки (адмін бачить усі) | користувач | `?status=` `?group=` `?page=` | `200` сторінка PowerReport | пізніше |
+| `POST /power-reports/` | Повідомити «у мене немає світла» | користувач | `{"group": "3.1", "comment": "..."}` | `201` PowerReport; `400` | пізніше |
+| `PATCH /power-reports/{id}/` | Підтвердити або відхилити заявку | адмін | `{"status": "confirmed"}` | `200` PowerReport; `400`, `404` | пізніше |
+
+### Бізнес-правила
+
+| Ситуація | Статус | Чому саме такий статус |
+| --- | --- | --- |
+| Видалити сервіс, для якого вже є перевірки | `409` | Запит коректний, але видалення знищило б історію моніторингу. Повідомлення радить деактивувати сервіс (`is_active: false`) |
+| Видалити сервіс, який згадується в інцидентах | `409` | Інциденти втратили б інформацію про зачеплені сервіси. Спочатку треба прибрати сервіс з інцидентів |
+| Відключення перетинається в часі з іншим для тієї ж групи | `400` | Дані запиту некоректні: такий інтервал не може існувати |
+| Кінець відключення раніше за початок або дорівнює йому | `400` | Некоректні дані |
+| Невідома група відключень (не `1.1`–`6.2`) | `400` | Некоректні дані |
+| Інцидент без жодного сервісу або з неіснуючим сервісом | `400` | Некоректні дані |
+| Інцидент завершився раніше, ніж почався | `400` | Некоректні дані |
+| Звернення до неіснуючого об'єкта | `404` | Об'єкт не знайдено. Повідомлення називає, що саме шукали |
+
+**Правило вибору:** `400` — помилка в даних, які надсилає клієнт; `409` — дані правильні,
+але дія неможлива через поточний стан бази даних.
+
+---
+
+## Схема бази даних
+
+![Схема бази даних](db-shema.png)
+
+---
+
+## Як запустити проєкт
+
+Потрібен Python 3.12, 3.13 або 3.14.
+
+1. **Склонувати репозиторій:**
+
+   ```bash
+   git clone https://github.com/Prokopiuk-Marta/detector-air-raid.git
+   cd detector-air-raid
+   ```
+
+2. **Створити й активувати віртуальне середовище:**
 
    ```bash
    python -m venv .venv
-   
-   # for linux/macos
-   source .venv/bin/activate
-   # for Windows:
-   .venv\Scripts\activate
+   .venv\Scripts\activate        # Windows
+   source .venv/bin/activate     # Linux / macOS
    ```
 
-2. Install dependencies:
+3. **Встановити залежності:**
 
    ```bash
    python -m pip install -r requirements-dev.txt
    ```
 
+4. **Створити файл `.env`** з токенами API тривог (за зразком `.env.example`):
 
-3. Apply migrations to create the local SQLite database:
+   ```bash
+   cp .env.example .env          # Windows: copy .env.example .env
+   ```
+
+   і вписати свої значення `ALERTS_IN_UA_TOKEN` та `UKRAINEALARM_API_KEY`.
+   Файл `.env` не комітимо.
+
+5. **Застосувати міграції** (створює таблиці в `db.sqlite3`):
 
    ```bash
    python manage.py migrate
    ```
 
-4. Start the development server:
+6. **Створити адміністратора:**
+
+   ```bash
+   python manage.py createsuperuser
+   ```
+
+7. **Запустити сервер:**
 
    ```bash
    python manage.py runserver
    ```
 
-## Endpoints
-
-With the server running at `http://127.0.0.1:8000`:
-
-| URL | Behavior |
+| Що | Адреса |
 | --- | --- |
-| http://127.0.0.1:8000/ | No application homepage; may show Django's development welcome page while `DEBUG = True` |
-| http://127.0.0.1:8000/admin/ | Django admin, available after applying migrations |
+| API | http://127.0.0.1:8000/api/v1/ |
+| Адмінка | http://127.0.0.1:8000/admin/ |
 
-With `DEBUG = False`, unmatched URLs such as `/` return HTTP 404.
+Перевірка стилю коду: `python check_submission.py`
 
-To create an account for admin login, run this after applying migrations:
+---
 
-```bash
-python manage.py createsuperuser
-```
+## Збір даних
 
-## Add your first application
+Дані збирають management-команди, які треба запускати регулярно (TODO: автоматичний запуск
+за розкладом — cron на сервері / Планувальник завдань Windows локально).
 
-1. Create an app from the directory containing `manage.py` (replace `myapp`
-   with your application name):
+| Команда | Що робить | Як часто |
+| --- | --- | --- |
+| `python manage.py check_services` | перевіряє всі активні сервіси й записує результат у `Check` | кожні 5 хвилин |
+| `python manage.py fetch_alerts` | завантажує активні тривоги Києва з alerts.in.ua: створює нові, оновлює рівень, закриває завершені | щохвилини |
 
-   ```bash
-   python manage.py startapp myapp
-   ```
+---
 
-2. Add its generated configuration class, `myapp.apps.MyappConfig`, to
-   `INSTALLED_APPS` in `config/settings.py`.
-3. Define your views and create `myapp/urls.py` with their URL patterns.
-4. Register that URLconf in `config/urls.py` using `path()` and `include()`,
-   choosing a URL prefix for the app and retaining the admin route.
+## Postman-колекція
 
-See the official Django 6.1 tutorial for
-[views and URL registration](https://docs.djangoproject.com/en/6.1/intro/tutorial01/)
-and [app registration and models](https://docs.djangoproject.com/en/6.1/intro/tutorial02/).
+Колекція з ендпоінтами лежить у [`postman/detector-air-raid.postman_collection.json`](postman/detector-air-raid.postman_collection.json)
+(формат Collection v2.1).
 
-## Start a REST API
+- Імпорт: Postman → **Import** → обрати файл.
+- Адреса сервера задана змінною колекції `{{base_url}}` (`http://127.0.0.1:8000/api/v1`).
+- Є успішні запити та запити з помилками (`400`, `404`, `409`); кожен має автоматичну перевірку статусу.
+- Запускайте папки по черзі (або всю колекцію через **Run collection**): запити залежать один від одного.
+- Для запиту «409: видалити сервіс з історією перевірок» у сервісу `diia` має бути хоча б одна перевірка (додається в адмінці).
 
-Django REST framework and `django-cors-headers` are included and configured.
-Install the project dependencies with `python -m pip install -r requirements-dev.txt`.
-Create your own app, serializers, views, and URL patterns; no API app or
-authentication scheme is supplied.
-
-## Git attributes
-
-Git detects text files automatically and normalizes them to LF. Checkouts use
-LF on Linux and Windows, while `.bat` and `.cmd` files use CRLF. Binary files
-are auto-detected and left unchanged, helping avoid newline-only diffs.
-
-
-## Code style and submission verification
-
-All submissions are required to adhere to PEP-8, Django best practices, and standard HTML/CSS/JS formatting. A deterministic cross-platform utility is provided to help you check and format your code.
-
-### 1. Verification (Check Mode)
-Before submitting, verify that all files adhere to the required standards:
-
-```bash
-python check_submission.py
-```
-
-Passing these checks confirms code style, not functional API behavior. Before submitting an API, also write and run functional tests for its endpoints. If style checks fail, review the error output or run the auto-formatter below.
-
-### 2. Auto-Formatting
-To automatically format Python files, fix safe PEP-8 rules, format Django HTML templates, and format CSS/JS static files:
-
-```bash
-python check_submission.py --format
-```
-
-### 3. PyCharm Integration
-If you use PyCharm:
-- **One-Click Run:** In the top-right toolbar run configurations dropdown, select **"Verify Submission"** or **"Format Project"** and click the green **Play** button.
-
-## Development only
-
-The included settings use `DEBUG = True`, a development secret key, and a local
-SQLite database. The default mailer uses the console backend: email is printed
-to the process's console instead of being delivered.
-
-This configuration and Django's development server are not suitable for
-production deployment.
+Фронтенд працює на http://localhost:3000, тому в `config/settings.py` цю адресу додано до
+`CORS_ALLOWED_ORIGINS`.
