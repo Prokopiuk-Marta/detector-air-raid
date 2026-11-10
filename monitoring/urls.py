@@ -27,4 +27,12 @@ urlpatterns = [
         name="incident-detail",
     ),
     path("alerts/", views.AlertListView.as_view(), name="alert-list"),
+    path(
+        "power-reports/", views.PowerReportListView.as_view(), name="power-report-list"
+    ),
+    path(
+        "power-reports/<int:pk>/",
+        views.PowerReportDetailView.as_view(),
+        name="power-report-detail",
+    ),
 ]

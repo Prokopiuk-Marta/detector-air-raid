@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Alert, Incident, PowerOutage, Service
+from .models import Alert, Incident, PowerOutage, PowerReport, Service
 
 
 class ServiceSerializer(serializers.ModelSerializer):
@@ -137,3 +137,12 @@ class AlertSerializer(serializers.ModelSerializer):
     def get_duration_minutes(self, obj):
         end = obj.finished_at or timezone.now()
         return int((end - obj.started_at).total_seconds() // 60)
+
+
+class PowerReportSerializer(serializers.ModelSerializer):
+    user = serializers.CharField(source="user.username", read_only=True)
+
+    class Meta:
+        model = PowerReport
+        fields = ["id", "user", "group", "comment", "created_at"]
+        read_only_fields = ["created_at"]

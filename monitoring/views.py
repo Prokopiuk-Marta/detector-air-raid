@@ -5,16 +5,18 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .exceptions import ConflictError
-from .models import Alert, Incident, PowerOutage, Service
+from .models import Alert, Incident, PowerOutage, PowerReport, Service
 from .permissions import IsAdminOrReadOnly
 from .serializers import (
     AlertSerializer,
     IncidentSerializer,
     PowerOutageSerializer,
+    PowerReportSerializer,
     ServiceSerializer,
 )
 
@@ -264,3 +266,52 @@ class ServiceTimelineView(APIView):
                 "incidents": IncidentSerializer(incidents, many=True).data,
             }
         )
+
+
+def reports_for(user):
+    """Адмін бачить усі заявки, звичайний користувач — лише свої."""
+    reports = PowerReport.objects.select_related("user")
+    if user.is_staff:
+        return reports
+    return reports.filter(user=user)
+
+
+class PowerReportListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        reports = reports_for(request.user)
+
+        group = request.query_params.get("group")
+        if group:
+            reports = reports.filter(group=group)
+
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(reports, request, view=self)
+        serializer = PowerReportSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+    def post(self, request):
+        serializer = PowerReportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(user=request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class PowerReportDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, request, pk):
+        try:
+            return reports_for(request.user).get(pk=pk)
+        except PowerReport.DoesNotExist:
+            raise NotFound("Заявку не знайдено.") from None
+
+    def get(self, request, pk):
+        report = self.get_object(request, pk)
+        return Response(PowerReportSerializer(report).data)
+
+    def delete(self, request, pk):
+        report = self.get_object(request, pk)
+        report.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
