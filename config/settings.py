@@ -13,7 +13,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from datetime import timedelta
 from pathlib import Path
-
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -25,13 +25,27 @@ load_dotenv(BASE_DIR / ".env")
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
+def env_bool(name, default=False):
+    """Читає змінну середовища як True/False ("true", "1", "yes" → True)."""
+    return os.environ.get(name, str(default)).strip().lower() in {"1", "true", "yes"}
+
+
+def env_list(name, default=""):
+    """Читає список через кому: "a, b" → ["a", "b"]."""
+    return [item.strip() for item in os.environ.get(name, default).split(",") if item.strip()]
+
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-csz#0g_+u88cb1nzqg9v5c@7!6jmj+(d3b(%12ha1a7vx2!otp"
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    raise ImproperlyConfigured(
+        "Не задано SECRET_KEY. Скопіюйте .env.example у .env і впишіть ключ."
+    )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env_bool("DEBUG", default=False)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", default="127.0.0.1,localhost")
 
 
 # Application definition
@@ -61,10 +75,10 @@ MIDDLEWARE = [
 ]
 
 # Allow local frontend development servers without allowing arbitrary origins.
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+CORS_ALLOWED_ORIGINS = env_list(
+    "CORS_ALLOWED_ORIGINS",
+    default="http://localhost:3000,http://127.0.0.1:3000",
+)
 
 ROOT_URLCONF = "config.urls"
 
