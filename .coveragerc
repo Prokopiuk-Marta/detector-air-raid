@@ -1,0 +1,13 @@
+[run]
+source =
+    accounts
+    monitoring
+    config
+omit =
+    */migrations/*
+    config/asgi.py
+    config/wsgi.py
+
+[report]
+show_missing = True
+skip_empty = True
