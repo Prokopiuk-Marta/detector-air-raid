@@ -1,4 +1,6 @@
+import logging
 from datetime import timedelta
+
 from django.db.models import Q
 from django.utils import timezone
 from drf_spectacular.utils import (
@@ -32,6 +34,8 @@ from .serializers import (
     PowerReportSerializer,
     ServiceSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class StandardPagination(PageNumberPagination):
@@ -100,7 +104,8 @@ class ServiceListView(APIView):
     def post(self, request):
         serializer = ServiceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        service = serializer.save()
+        logger.info("Адмін %s додав сервіс '%s'", request.user.username, service.slug)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -145,6 +150,12 @@ class ServiceDetailView(APIView):
         serializer = ServiceSerializer(service, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        logger.info(
+            "Адмін %s змінив сервіс '%s': %s",
+            request.user.username,
+            service.slug,
+            sorted(serializer.validated_data),
+        )
         return Response(serializer.data)
 
     @extend_schema(
@@ -185,6 +196,7 @@ class ServiceDetailView(APIView):
             )
 
         service.delete()
+        logger.info("Адмін %s видалив сервіс '%s'", request.user.username, slug)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -228,7 +240,13 @@ class PowerOutageListView(APIView):
     def post(self, request):
         serializer = PowerOutageSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        outage = serializer.save()
+        logger.info(
+            "Адмін %s додав відключення id %s (група %s)",
+            request.user.username,
+            outage.id,
+            outage.group,
+        )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -258,6 +276,7 @@ class PowerOutageDetailView(APIView):
     def delete(self, request, pk):
         outage = self.get_object(pk)
         outage.delete()
+        logger.info("Адмін %s видалив відключення id %s", request.user.username, pk)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -311,7 +330,8 @@ class IncidentListView(APIView):
     def post(self, request):
         serializer = IncidentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        incident = serializer.save()
+        logger.info("Адмін %s додав інцидент id %s", request.user.username, incident.id)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -341,10 +361,10 @@ class IncidentDetailView(APIView):
     def delete(self, request, pk):
         incident = self.get_object(pk)
         incident.delete()
+        logger.info("Адмін %s видалив інцидент id %s", request.user.username, pk)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-# ---------- Тривоги ----------
 
 
 class AlertListView(APIView):
@@ -369,7 +389,6 @@ class AlertListView(APIView):
         return paginator.get_paginated_response(serializer.data)
 
 
-# ---------- Дані для графіка статистики ----------
 
 TIMELINE_DAYS = {1, 7, 30}
 
@@ -538,7 +557,13 @@ class PowerReportListView(APIView):
     def post(self, request):
         serializer = PowerReportSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(user=request.user)
+        report = serializer.save(user=request.user)
+        logger.info(
+            "Нова заявка «немає світла» id %s: група %s, користувач %s",
+            report.id,
+            report.group,
+            request.user.username,
+        )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -579,4 +604,5 @@ class PowerReportDetailView(APIView):
     def delete(self, request, pk):
         report = self.get_object(request, pk)
         report.delete()
+        logger.info("Користувач %s видалив заявку id %s", request.user.username, pk)
         return Response(status=status.HTTP_204_NO_CONTENT)

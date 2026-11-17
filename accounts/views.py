@@ -1,3 +1,4 @@
+import logging
 from drf_spectacular.utils import OpenApiExample, extend_schema, inline_serializer
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -8,6 +9,8 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from monitoring.schema import AUTH_401, VALIDATION_400, error_response
 
 from .serializers import RegisterSerializer, UserSerializer
+
+logger = logging.getLogger(__name__)
 
 AUTH = ["Автентифікація"]
 
@@ -45,6 +48,7 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+        logger.info("Зареєстровано користувача %s (id %s)", user.username, user.id)
         return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
 
@@ -70,7 +74,10 @@ class LoginView(TokenObtainPairView):
         },
     )
     def post(self, request, *args, **kwargs):
-        return super().post(request, *args, **kwargs)
+        response = super().post(request, *args, **kwargs)
+        # Логуємо лише ім'я користувача: ні пароль, ні токени в лог не потрапляють.
+        logger.info("Успішний вхід: %s", request.data.get("username"))
+        return response
 
 
 class RefreshView(TokenRefreshView):
