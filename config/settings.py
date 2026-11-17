@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "corsheaders",
+    "drf_spectacular",
     "monitoring.apps.MonitoringConfig",
     "accounts.apps.AccountsConfig",
 ]
@@ -158,6 +159,7 @@ MAILERS = {
 }
 
 REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "monitoring.exceptions.custom_exception_handler",
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -170,3 +172,13 @@ SIMPLE_JWT = {
 
 ALERTS_IN_UA_TOKEN = os.environ.get("ALERTS_IN_UA_TOKEN", "")
 UKRAINEALARM_API_KEY = os.environ.get("UKRAINEALARM_API_KEY", "")
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Detector bro API",
+    "DESCRIPTION": "Моніторинг доступності сервісів під час тривог і відключень світла в Києві.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SCHEMA_PATH_PREFIX": r"/api/v1",
+}
+
