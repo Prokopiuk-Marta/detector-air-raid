@@ -1,16 +1,23 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema_field, inline_serializer
 from rest_framework import serializers
 
 from .models import Alert, Incident, PowerOutage, PowerReport, Service
+from .stats import PERIODS, uptime_by_period
 
+UPTIME_SCHEMA = inline_serializer(
+    name="Uptime",
+    fields={name: serializers.FloatField(allow_null=True) for name in PERIODS},
+)
 
 class ServiceSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     response_time_ms = serializers.SerializerMethodField()
     last_checked_at = serializers.SerializerMethodField()
     uptime_7d = serializers.SerializerMethodField()
+    uptime = serializers.SerializerMethodField()
 
     class Meta:
         model = Service
@@ -25,23 +32,24 @@ class ServiceSerializer(serializers.ModelSerializer):
             "response_time_ms",
             "last_checked_at",
             "uptime_7d",
+            "uptime",
         ]
 
-    def get_status(self, obj):
+    def get_status(self, obj) -> str:
         last_check = obj.checks.first()
         if last_check is None:
             return "unknown"
         return "up" if last_check.is_up else "down"
 
-    def get_response_time_ms(self, obj):
+    def get_response_time_ms(self, obj) -> int | None:
         last_check = obj.checks.first()
         return last_check.response_time_ms if last_check else None
 
-    def get_last_checked_at(self, obj):
+    def get_last_checked_at(self, obj) -> datetime | None:
         last_check = obj.checks.first()
         return last_check.checked_at if last_check else None
 
-    def get_uptime_7d(self, obj):
+    def get_uptime_7d(self, obj) -> float | None:
         week_ago = timezone.now() - timedelta(days=7)
         checks = obj.checks.filter(checked_at__gte=week_ago)
         total = checks.count()
@@ -49,6 +57,10 @@ class ServiceSerializer(serializers.ModelSerializer):
             return None
         up = checks.filter(is_up=True).count()
         return round(up / total * 100, 2)
+
+    @extend_schema_field(UPTIME_SCHEMA)
+    def get_uptime(self, obj):
+        return uptime_by_period(obj)
 
 
 class PowerOutageSerializer(serializers.ModelSerializer):
@@ -134,7 +146,7 @@ class AlertSerializer(serializers.ModelSerializer):
             "duration_minutes",
         ]
 
-    def get_duration_minutes(self, obj):
+    def get_duration_minutes(self, obj) -> int:
         end = obj.finished_at or timezone.now()
         return int((end - obj.started_at).total_seconds() // 60)
 

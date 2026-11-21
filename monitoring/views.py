@@ -34,6 +34,7 @@ from .serializers import (
     PowerReportSerializer,
     ServiceSerializer,
 )
+from .stats import PERIODS, service_stats
 
 logger = logging.getLogger(__name__)
 
@@ -478,6 +479,108 @@ class ServiceTimelineView(APIView):
                 "incidents": IncidentSerializer(incidents, many=True).data,
             }
         )
+
+STATS_BUCKET = inline_serializer(
+    name="StatsBucket",
+    fields={
+        "checks": serializers.IntegerField(),
+        "uptime_percent": serializers.FloatField(allow_null=True),
+        "avg_response_time_ms": serializers.IntegerField(allow_null=True),
+    },
+)
+STATS_COMPARISON = {"during": STATS_BUCKET, "without": STATS_BUCKET}
+GROUPS = {group for group, _label in PowerOutage.GROUP_CHOICES}
+
+
+class ServiceStatsView(APIView):
+    @extend_schema(
+        tags=SERVICES,
+        summary="Статистика сервісу: тривоги, відключення, години доби",
+        description=(
+            "Доступність і середній час відповіді сервісу за період: загалом, "
+            "під час тривог і без них (також окремо для жовтих і червоних), "
+            "під час відключень світла і без них, і для кожної години доби "
+            "(київський час). `uptime_percent` і `avg_response_time_ms` — `null`, "
+            "якщо перевірок у цій частині немає."
+        ),
+        parameters=[
+            OpenApiParameter(
+                "period", str, enum=list(PERIODS), default="7d", description="Період."
+            ),
+            OpenApiParameter(
+                "group",
+                str,
+                enum=sorted(GROUPS),
+                description="Група відключень. Без неї — відключення будь-якої групи.",
+            ),
+        ],
+        responses={
+            200: inline_serializer(
+                name="ServiceStats",
+                fields={
+                    "service": inline_serializer(
+                        name="StatsService",
+                        fields={
+                            "slug": serializers.CharField(),
+                            "name": serializers.CharField(),
+                        },
+                    ),
+                    "period": serializers.CharField(),
+                    "from": serializers.DateTimeField(),
+                    "to": serializers.DateTimeField(),
+                    "checks": serializers.IntegerField(),
+                    "uptime_percent": serializers.FloatField(allow_null=True),
+                    "avg_response_time_ms": serializers.IntegerField(allow_null=True),
+                    "alerts": inline_serializer(
+                        name="StatsAlerts",
+                        fields={
+                            **STATS_COMPARISON,
+                            "by_level": inline_serializer(
+                                name="StatsAlertLevels",
+                                fields={"yellow": STATS_BUCKET, "red": STATS_BUCKET},
+                            ),
+                        },
+                    ),
+                    "outages": inline_serializer(
+                        name="StatsOutages",
+                        fields={
+                            "group": serializers.CharField(allow_null=True),
+                            **STATS_COMPARISON,
+                        },
+                    ),
+                    "by_hour": inline_serializer(
+                        name="StatsHour",
+                        fields={
+                            "hour": serializers.IntegerField(),
+                            "checks": serializers.IntegerField(),
+                            "uptime_percent": serializers.FloatField(allow_null=True),
+                            "avg_response_time_ms": serializers.IntegerField(
+                                allow_null=True
+                            ),
+                        },
+                        many=True,
+                    ),
+                },
+            ),
+            400: VALIDATION_400,
+            404: not_found_404("Сервіс 'netflix' не знайдено."),
+        },
+    )
+    def get(self, request, slug):
+        try:
+            service = Service.objects.get(slug=slug)
+        except Service.DoesNotExist:
+            raise NotFound(f"Сервіс '{slug}' не знайдено.")
+
+        period = request.query_params.get("period", "7d")
+        if period not in PERIODS:
+            raise ValidationError({"period": ["Допустимі значення: 24h, 7d або 30d."]})
+
+        group = request.query_params.get("group") or None
+        if group is not None and group not in GROUPS:
+            raise ValidationError({"group": [f"Групи '{group}' не існує."]})
+
+        return Response(service_stats(service, period, group))
 
 
 def reports_for(user):
