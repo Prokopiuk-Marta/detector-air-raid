@@ -14,6 +14,11 @@ urlpatterns = [
         views.ServiceTimelineView.as_view(),
         name="service-timeline",
     ),
+    path(
+        "services/<slug:slug>/stats/",
+        views.ServiceStatsView.as_view(),
+        name="service-stats",
+    ),
     path("outages/", views.PowerOutageListView.as_view(), name="outage-list"),
     path(
         "outages/<int:pk>/",
