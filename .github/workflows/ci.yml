@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      SECRET_KEY: ci-only-key-not-a-secret
+      DEBUG: "False"
+
+    steps:
+      - name: Отримати код
+        uses: actions/checkout@v4
+
+      - name: Встановити Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Встановити залежності
+        run: pip install -r requirements-dev.txt
+
+      - name: Перевірити стиль коду (ruff)
+        run: ruff check .
+
+      - name: Перевірити налаштування Django
+        run: python manage.py check
+
+      - name: Перевірити, що не забули міграції
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Перевірити OpenAPI-схему
+        run: python manage.py spectacular --validate --file schema.yml
+
+      - name: Запустити тести з покриттям
+        run: pytest --cov
