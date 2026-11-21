@@ -37,7 +37,7 @@ jobs:
         run: python manage.py makemigrations --check --dry-run
 
       - name: Перевірити OpenAPI-схему
-        run: python manage.py spectacular --validate --file schema.yml
+        run: python manage.py spectacular --validate --fail-on-warn --file schema.yml
 
       - name: Запустити тести з покриттям
         run: pytest --cov

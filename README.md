@@ -275,9 +275,13 @@ Authorization: Bearer <access>
   "status": "up",
   "response_time_ms": 340,
   "uptime_7d": 99.42,
+  "uptime": {"24h": 100.0, "7d": 99.42, "30d": 98.9},
   "last_checked_at": "2026-10-27T14:05:00+02:00"
 }
 ```
+
+`uptime` — доступність у відсотках за 24 години, 7 і 30 днів (`null`, якщо перевірок за період
+немає). `uptime_7d` лишено для сумісності, це те саме, що `uptime["7d"]`.
 
 `status`: `up`, `down` або `unknown`. Сервіс вважається недоступним, якщо не відповів або
 повернув код `5xx`. Код `4xx` (наприклад, `403`, коли сайт блокує автоматичні запити) означає,
@@ -343,13 +347,13 @@ Authorization: Bearer <access>
 | Метод і шлях | Для чого | Доступ | Запит | Відповідь | Стан |
 | --- | --- | --- | --- | --- | --- |
 | `GET /services/` | Список сервісів | усі | — (TODO: `?status=`, `?ordering=`) | `200` масив Service | готово |
-| `GET /services/{slug}/` | Сторінка сервісу | усі | — | `200` Service; `404` (TODO: `"uptime": {"24h", "7d", "30d"}`) | готово |
+| `GET /services/{slug}/` | Сторінка сервісу | усі | — | `200` Service; `404` | готово |
 | `POST /services/` | Додати сервіс | адмін | `{"name", "slug", "url", "description", "is_active"}` | `201` Service; `400` | готово |
 | `PATCH /services/{slug}/` | Редагувати сервіс | адмін | будь-які поля з POST | `200` Service; `400`, `404` | готово |
 | `DELETE /services/{slug}/` | Видалити сервіс | адмін | — | `204`; `404`; `409` (є перевірки або інциденти) | готово |
 | `GET /services/{slug}/timeline/` | Дані для графіка: перевірки, тривоги, відключення, інциденти за період | усі | `?days=1\|7\|30` (за замовчуванням 7) | `200` див. нижче; `400` (інше значення `days`), `404` | готово |
 | `GET /services/{slug}/checks/` | Історія перевірок для графіка | усі | `?from=` `?to=` (дата) `?page=` | `200` сторінка Check; `404` | пізніше |
-| `GET /services/{slug}/stats/` | Статистика | усі | `?period=24h\|7d\|30d` `?alert_level=` `?group=` | `200` див. нижче; `404` | пізніше |
+| `GET /services/{slug}/stats/` | Статистика: загалом, під час тривог і відключень, по годинах | усі | `?period=24h\|7d\|30d` (за замовчуванням 7d) `?group=3.1` | `200` див. нижче; `400` (невідомий період чи група), `404` | готово |
 
 Відповідь `GET /services/{slug}/timeline/?days=7`:
 
@@ -365,18 +369,41 @@ Authorization: Bearer <access>
 }
 ```
 
-Відповідь `GET /services/{slug}/stats/` (план):
+Відповідь `GET /services/{slug}/stats/?period=7d&group=3.1`:
 
 ```json
 {
+  "service": {"slug": "diia", "name": "Дія"},
   "period": "7d",
+  "from": "2026-11-14T22:00:00+02:00",
+  "to": "2026-11-21T22:00:00+02:00",
+  "checks": 2016,
   "uptime_percent": 99.42,
   "avg_response_time_ms": 371,
-  "by_hour": [{"hour": 0, "uptime_percent": 100.0, "avg_response_time_ms": 310}],
-  "during_alerts": {"uptime_percent": 97.2, "avg_response_time_ms": 512},
-  "without_alerts": {"uptime_percent": 99.7, "avg_response_time_ms": 354}
+  "alerts": {
+    "during": {"checks": 210, "uptime_percent": 97.14, "avg_response_time_ms": 512},
+    "without": {"checks": 1806, "uptime_percent": 99.72, "avg_response_time_ms": 354},
+    "by_level": {
+      "yellow": {"checks": 150, "uptime_percent": 98.0, "avg_response_time_ms": 470},
+      "red": {"checks": 60, "uptime_percent": 95.0, "avg_response_time_ms": 617}
+    }
+  },
+  "outages": {
+    "group": "3.1",
+    "during": {"checks": 320, "uptime_percent": 99.06, "avg_response_time_ms": 402},
+    "without": {"checks": 1696, "uptime_percent": 99.49, "avg_response_time_ms": 365}
+  },
+  "by_hour": [{"hour": 0, "checks": 84, "uptime_percent": 100.0, "avg_response_time_ms": 310}]
 }
 ```
+
+- Перевірки за період діляться на ті, що припали на тривогу (відключення), і решту; для кожної
+  частини рахуються доступність і середній час відповіді. Так видно, чи працює сервіс гірше під
+  час тривог і відключень.
+- `by_level` — окремо для жовтих і червоних тривог. Тривога, що ще триває, рахується до кінця періоду.
+- `outages.group` — група з `?group=`; без неї враховуються відключення будь-якої групи.
+- `by_hour` — 24 елементи, година за київським часом.
+- Середній час відповіді рахується лише за успішними перевірками; `null` — перевірок немає.
 
 #### Тривоги та відключення світла
 
@@ -567,6 +594,7 @@ pytest --cov --cov-report=html      # звіт у браузері: htmlcov/inde
 | `tests/test_service.py` | сервіси: `401` для гостя, `403` для користувача, CRUD для адміна, валідація, розрахунок статусу й uptime, бізнес-правила `409` |
 | `tests/test_auth.py` | реєстрація з валідацією, хешування пароля, JWT: вхід, refresh, запити з токеном, повний сценарій «реєстрація → вхід → заявка» |
 | `tests/test_logging.py` | потрібні події записуються в лог, а паролі, токени й введені дані — ні |
+| `tests/test_stats.py` | статистика: період, поділ перевірок на «під час тривог / відключень» і «без», рівні тривог, групи, години доби, uptime за 24 год / 7 / 30 днів |
 
 Налаштування: `pytest.ini` (модуль налаштувань Django, папка з тестами),
 `.coveragerc` (що враховувати в покритті: міграції не рахуються).
