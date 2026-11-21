@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from datetime import timedelta
 from pathlib import Path
+
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
@@ -25,6 +26,7 @@ load_dotenv(BASE_DIR / ".env")
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
+
 def env_bool(name, default=False):
     """Читає змінну середовища як True/False ("true", "1", "yes" → True)."""
     return os.environ.get(name, str(default)).strip().lower() in {"1", "true", "yes"}
@@ -32,7 +34,11 @@ def env_bool(name, default=False):
 
 def env_list(name, default=""):
     """Читає список через кому: "a, b" → ["a", "b"]."""
-    return [item.strip() for item in os.environ.get(name, default).split(",") if item.strip()]
+    return [
+        item.strip()
+        for item in os.environ.get(name, default).split(",")
+        if item.strip()
+    ]
 
 
 # SECURITY WARNING: keep the secret key used in production secret!

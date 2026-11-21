@@ -1,6 +1,7 @@
 import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+
 from tests.conftest import PASSWORD
 
 User = get_user_model()
@@ -24,8 +25,6 @@ def get_tokens(client, username, password=PASSWORD):
         TOKEN_URL, {"username": username, "password": password}, format="json"
     )
     return response.data
-
-
 
 
 def test_register_creates_user_with_hashed_password(api_client):
@@ -106,8 +105,6 @@ def test_cannot_register_with_taken_username(api_client, user):
     assert "username" in response.data["error"]["details"]
 
 
-
-
 def test_login_returns_access_and_refresh(api_client, user):
     response = api_client.post(
         TOKEN_URL, {"username": user.username, "password": PASSWORD}, format="json"
@@ -142,8 +139,6 @@ def test_refresh_with_invalid_token_returns_401(api_client):
 
     assert response.status_code == 401
     assert "Токен недійсний" in response.data["error"]["message"]
-
-
 
 
 def test_me_with_access_token(api_client, user):

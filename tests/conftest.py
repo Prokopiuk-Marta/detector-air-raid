@@ -19,6 +19,7 @@ def fast_password_hasher(settings):
     """Швидкий хешер паролів лише для тестів: справжній навмисно повільний."""
     settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
+
 @pytest.fixture
 def api_client():
     """Клієнт без входу (гість)."""

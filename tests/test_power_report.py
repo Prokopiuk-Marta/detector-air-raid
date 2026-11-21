@@ -13,8 +13,6 @@ def detail_url(report_id):
     return reverse("power-report-detail", args=[report_id])
 
 
-
-
 def test_guest_cannot_list_reports(api_client):
     response = api_client.get(LIST_URL)
 
@@ -34,8 +32,6 @@ def test_guest_cannot_delete_report(api_client, report):
 
     assert response.status_code == 401
     assert PowerReport.objects.filter(id=report.id).exists()
-
-
 
 
 def test_user_creates_report(user_client, user):
@@ -85,8 +81,6 @@ def test_invalid_report_returns_400(user_client, payload, field):
     assert PowerReport.objects.count() == 0
 
 
-
-
 def test_user_sees_only_own_reports(user_client, report, other_user):
     PowerReport.objects.create(user=other_user, group="5.2")
 
@@ -129,8 +123,6 @@ def test_filter_reports_by_group(staff_client, report, other_user):
     assert response.data["results"][0]["group"] == "2.1"
 
 
-
-
 def test_user_gets_own_report(user_client, report):
     response = user_client.get(detail_url(report.id))
 
@@ -150,8 +142,6 @@ def test_nonexistent_report_returns_404(user_client):
     response = user_client.get(detail_url(99999))
 
     assert response.status_code == 404
-
-
 
 
 def test_user_deletes_own_report(user_client, report):
@@ -179,8 +169,6 @@ def test_deleting_nonexistent_report_returns_404(user_client):
     response = user_client.delete(detail_url(99999))
 
     assert response.status_code == 404
-
-
 
 
 @pytest.mark.parametrize("method", ["put", "patch"])

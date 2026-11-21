@@ -365,8 +365,6 @@ class IncidentDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-
-
 class AlertListView(APIView):
     serializer_class = AlertSerializer
 
@@ -387,7 +385,6 @@ class AlertListView(APIView):
         page = paginator.paginate_queryset(alerts, request, view=self)
         serializer = AlertSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
-
 
 
 TIMELINE_DAYS = {1, 7, 30}

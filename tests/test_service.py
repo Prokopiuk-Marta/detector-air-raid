@@ -3,6 +3,7 @@ from datetime import timedelta
 import pytest
 from django.urls import reverse
 from django.utils import timezone
+
 from monitoring.models import Check, Incident, Service
 
 LIST_URL = reverse("service-list")
@@ -17,8 +18,6 @@ NEW_SERVICE = {
 
 def detail_url(slug):
     return reverse("service-detail", args=[slug])
-
-
 
 
 def test_guest_sees_service_list(api_client, service):
@@ -64,8 +63,6 @@ def test_nonexistent_service_returns_404(api_client):
     assert response.data["error"]["message"] == "Сервіс 'netflix' не знайдено."
 
 
-
-
 def test_guest_cannot_create_service(api_client):
     response = api_client.post(LIST_URL, NEW_SERVICE, format="json")
 
@@ -84,8 +81,6 @@ def test_guest_cannot_delete_service(api_client, service):
 
     assert response.status_code == 401
     assert Service.objects.filter(slug=service.slug).exists()
-
-
 
 
 def test_user_cannot_create_service(user_client):
@@ -109,8 +104,6 @@ def test_user_cannot_delete_service(user_client, service):
 
     assert response.status_code == 403
     assert Service.objects.filter(slug=service.slug).exists()
-
-
 
 
 def test_staff_creates_service(staff_client):
@@ -142,8 +135,6 @@ def test_invalid_service_returns_400(staff_client, service, changes, field):
     assert Service.objects.count() == 1
 
 
-
-
 def test_staff_updates_only_given_fields(staff_client, service):
     response = staff_client.patch(
         detail_url(service.slug), {"is_active": False}, format="json"
@@ -162,8 +153,6 @@ def test_staff_update_with_invalid_url_returns_400(staff_client, service):
 
     assert response.status_code == 400
     assert "url" in response.data["error"]["details"]
-
-
 
 
 def test_staff_deletes_service_without_history(staff_client, service):

@@ -1,4 +1,5 @@
 import logging
+
 from drf_spectacular.utils import OpenApiExample, extend_schema, inline_serializer
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -75,7 +76,6 @@ class LoginView(TokenObtainPairView):
     )
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
-        # Логуємо лише ім'я користувача: ні пароль, ні токени в лог не потрапляють.
         logger.info("Успішний вхід: %s", request.data.get("username"))
         return response
 
