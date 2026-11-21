@@ -40,6 +40,13 @@ class Check(models.Model):
 
 
 class Alert(models.Model):
+    LEVEL_CHOICES = [
+        ("yellow", "Жовтий"),
+        ("red", "Червоний"),
+    ]
+    external_id = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    alert_type = models.CharField(max_length=30, default="air_raid")
+    alert_level = models.CharField(max_length=10, choices=LEVEL_CHOICES, default="red")
     started_at = models.DateTimeField()
     finished_at = models.DateTimeField(null=True, blank=True)
 
@@ -103,3 +110,20 @@ class Incident(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class PowerReport(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="power_reports",
+    )
+    group = models.CharField(max_length=3, choices=PowerOutage.GROUP_CHOICES)
+    comment = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user} — група {self.group} ({self.created_at:%d.%m %H:%M})"

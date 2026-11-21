@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "Detector Air Raid API",
-    "description": "Усі ендпоінти Detector Air Raid: успішні запити та запити з помилками.\n\nЗапускайте папки по черзі (або всю колекцію через Runner): запити залежать один від одного (створення → перегляд → редагування → видалення).\n\nЗмінна base_url задає адресу сервера.",
+    "name": "Detector bro API",
+    "description": "Усі ендпоінти Detector bro: успішні запити та запити з помилками.\n\nПеред запуском: впишіть у змінні колекції admin_username і admin_password дані свого суперкористувача.\n\nЗапускайте всю колекцію через Run collection або папки по черзі, починаючи з «1. Авторизація»: вона реєструє нового користувача й зберігає токени в access_token, refresh_token і admin_token.\n\nЗа замовчуванням запити йдуть з токеном адміна (авторизація колекції); запити гостя мають No Auth, запити користувача — Bearer {{access_token}}.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -10,17 +10,708 @@
       "value": "http://127.0.0.1:8000/api/v1"
     },
     {
+      "key": "admin_username",
+      "value": "admin"
+    },
+    {
+      "key": "admin_password",
+      "value": ""
+    },
+    {
+      "key": "user_username",
+      "value": ""
+    },
+    {
+      "key": "user_password",
+      "value": "Svitlo2026!"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    },
+    {
+      "key": "admin_token",
+      "value": ""
+    },
+    {
       "key": "outage_id",
       "value": ""
     },
     {
       "key": "incident_id",
       "value": ""
+    },
+    {
+      "key": "report_id",
+      "value": ""
     }
   ],
   "item": [
     {
-      "name": "1. Сервіси",
+      "name": "1. Авторизація",
+      "item": [
+        {
+          "name": "Реєстрація користувача",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"user_username\", \"tester_\" + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Пароль не повертається\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.not.have.property(\"password\");",
+                  "    pm.expect(json).to.not.have.property(\"password_confirm\");",
+                  "    pm.expect(json.username).to.eql(pm.collectionVariables.get(\"user_username\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/register/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{user_username}}\",\n  \"email\": \"{{user_username}}@example.com\",\n  \"first_name\": \"Тест\",\n  \"password\": \"{{user_password}}\",\n  \"password_confirm\": \"{{user_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Щоразу створює нового користувача з унікальним іменем (див. Pre-request)."
+          }
+        },
+        {
+          "name": "❌ 400: зайняті username і email (інший регістр)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Єдиний формат помилки\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"error\");",
+                  "    pm.expect(json.error).to.have.all.keys(\"status\", \"message\", \"details\");",
+                  "});",
+                  "pm.test(\"Помилки для username і email\", function () {",
+                  "    const details = pm.response.json().error.details;",
+                  "    pm.expect(details).to.have.property(\"username\");",
+                  "    pm.expect(details).to.have.property(\"email\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/register/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{user_username}}\",\n  \"email\": \"{{user_username}}@EXAMPLE.com\",\n  \"password\": \"{{user_password}}\",\n  \"password_confirm\": \"{{user_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "❌ 400: паролі не збігаються",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Єдиний формат помилки\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"error\");",
+                  "    pm.expect(json.error).to.have.all.keys(\"status\", \"message\", \"details\");",
+                  "});",
+                  "pm.test(\"Помилка в password_confirm\", function () {",
+                  "    pm.expect(pm.response.json().error.details).to.have.property(\"password_confirm\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/register/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"another_user_x\",\n  \"email\": \"another_x@example.com\",\n  \"password\": \"Svitlo2026!\",\n  \"password_confirm\": \"Svitlo2026?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "❌ 400: слабкий пароль і некоректний email",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Єдиний формат помилки\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"error\");",
+                  "    pm.expect(json.error).to.have.all.keys(\"status\", \"message\", \"details\");",
+                  "});",
+                  "pm.test(\"Помилки для email і password\", function () {",
+                  "    const details = pm.response.json().error.details;",
+                  "    pm.expect(details).to.have.property(\"email\");",
+                  "    pm.expect(details).to.have.property(\"password\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/register/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"another_user_y\",\n  \"email\": \"not-an-email\",\n  \"password\": \"1234\",\n  \"password_confirm\": \"1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "❌ 400: немає обов'язкових полів",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Єдиний формат помилки\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"error\");",
+                  "    pm.expect(json.error).to.have.all.keys(\"status\", \"message\", \"details\");",
+                  "});",
+                  "pm.test(\"Перелічено всі обов'язкові поля\", function () {",
+                  "    pm.expect(pm.response.json().error.details).to.include.all.keys(\"username\", \"email\", \"password\", \"password_confirm\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/register/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Вхід користувача (отримати JWT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Є access і refresh\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.all.keys(\"access\", \"refresh\");",
+                  "    pm.collectionVariables.set(\"access_token\", json.access);",
+                  "    pm.collectionVariables.set(\"refresh_token\", json.refresh);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/token/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "token",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{user_username}}\",\n  \"password\": \"{{user_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Зберігає токени у змінні access_token і refresh_token."
+          }
+        },
+        {
+          "name": "❌ 401: неправильний пароль",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 401\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test(\"Єдиний формат помилки\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"error\");",
+                  "    pm.expect(json.error).to.have.all.keys(\"status\", \"message\", \"details\");",
+                  "});",
+                  "pm.test(\"Зрозуміле повідомлення\", function () {",
+                  "    pm.expect(pm.response.json().error.message).to.include(\"Неправильний логін або пароль\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/token/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "token",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{user_username}}\",\n  \"password\": \"wrong-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Оновити access-токен",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Новий access\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"access\");",
+                  "    pm.collectionVariables.set(\"access_token\", json.access);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/token/refresh/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "token",
+                "refresh",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "❌ 401: недійсний refresh-токен",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 401\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test(\"Єдиний формат помилки\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"error\");",
+                  "    pm.expect(json.error).to.have.all.keys(\"status\", \"message\", \"details\");",
+                  "});",
+                  "pm.test(\"Зрозуміле повідомлення\", function () {",
+                  "    pm.expect(pm.response.json().error.message).to.include(\"Токен недійсний\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/token/refresh/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "token",
+                "refresh",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"not-a-token\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Хто я",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Це наш користувач, не адмін\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.username).to.eql(pm.collectionVariables.get(\"user_username\"));",
+                  "    pm.expect(json.is_staff).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/me/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "me",
+                ""
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "❌ 401: хто я без токена",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 401\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test(\"Єдиний формат помилки\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"error\");",
+                  "    pm.expect(json.error).to.have.all.keys(\"status\", \"message\", \"details\");",
+                  "});",
+                  "pm.test(\"Зрозуміле повідомлення\", function () {",
+                  "    pm.expect(pm.response.json().error.message).to.include(\"Потрібно увійти\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/me/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "me",
+                ""
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Вхід адміністратора",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Збережено admin_token\", function () {",
+                  "    pm.collectionVariables.set(\"admin_token\", pm.response.json().access);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/token/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "token",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{admin_username}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Перед запуском впишіть у змінні колекції admin_username і admin_password дані суперкористувача."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Сервіси",
       "item": [
         {
           "name": "Список сервісів",
@@ -307,10 +998,11 @@
             }
           ]
         }
-      ]
+      ],
+      "description": "Змінювати дані може лише адміністратор: запити використовують {{admin_token}} (авторизація колекції)."
     },
     {
-      "name": "2. Відключення світла",
+      "name": "3. Відключення світла",
       "item": [
         {
           "name": "Створити відключення",
@@ -750,10 +1442,11 @@
             }
           ]
         }
-      ]
+      ],
+      "description": "Змінювати дані може лише адміністратор: запити використовують {{admin_token}} (авторизація колекції)."
     },
     {
-      "name": "3. Інциденти",
+      "name": "4. Інциденти",
       "item": [
         {
           "name": "Створити інцидент",
@@ -1165,10 +1858,11 @@
             }
           ]
         }
-      ]
+      ],
+      "description": "Змінювати дані може лише адміністратор: запити використовують {{admin_token}} (авторизація колекції)."
     },
     {
-      "name": "4. Бізнес-правила (409)",
+      "name": "5. Бізнес-правила (409)",
       "item": [
         {
           "name": "409: видалити сервіс, що згадується в інциденті",
@@ -1306,7 +2000,986 @@
             }
           ]
         }
+      ],
+      "description": "Змінювати дані може лише адміністратор: запити використовують {{admin_token}} (авторизація колекції)."
+    },
+    {
+      "name": "6. Права доступу (401 / 403)",
+      "item": [
+        {
+          "name": "Гість переглядає сервіси",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/services/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "services",
+                ""
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "❌ 401: гість створює сервіс",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 401\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test(\"Єдиний формат помилки\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"error\");",
+                  "    pm.expect(json.error).to.have.all.keys(\"status\", \"message\", \"details\");",
+                  "});",
+                  "pm.test(\"Зрозуміле повідомлення\", function () {",
+                  "    pm.expect(pm.response.json().error.message).to.include(\"Потрібно увійти\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/services/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "services",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Гостьовий\",\n  \"slug\": \"guest-service\",\n  \"url\": \"https://example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "❌ 403: користувач створює сервіс",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 403\", function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test(\"Єдиний формат помилки\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"error\");",
+                  "    pm.expect(json.error).to.have.all.keys(\"status\", \"message\", \"details\");",
+                  "});",
+                  "pm.test(\"Зрозуміле повідомлення\", function () {",
+                  "    pm.expect(pm.response.json().error.message).to.include(\"лише адміністратор\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/services/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "services",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Користувацький\",\n  \"slug\": \"user-service\",\n  \"url\": \"https://example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "❌ 403: користувач видаляє сервіс",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 403\", function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test(\"Єдиний формат помилки\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"error\");",
+                  "    pm.expect(json.error).to.have.all.keys(\"status\", \"message\", \"details\");",
+                  "});",
+                  "pm.test(\"Зрозуміле повідомлення\", function () {",
+                  "    pm.expect(pm.response.json().error.message).to.include(\"лише адміністратор\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/services/diia/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "services",
+                "diia",
+                ""
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "❌ 403: користувач додає відключення",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 403\", function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test(\"Єдиний формат помилки\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"error\");",
+                  "    pm.expect(json.error).to.have.all.keys(\"status\", \"message\", \"details\");",
+                  "});",
+                  "pm.test(\"Зрозуміле повідомлення\", function () {",
+                  "    pm.expect(pm.response.json().error.message).to.include(\"лише адміністратор\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/outages/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "outages",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"group\": \"1.1\",\n  \"started_at\": \"2026-12-05T10:00:00+02:00\",\n  \"finished_at\": \"2026-12-05T12:00:00+02:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "❌ 401: недійсний токен",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 401\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test(\"Єдиний формат помилки\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"error\");",
+                  "    pm.expect(json.error).to.have.all.keys(\"status\", \"message\", \"details\");",
+                  "});",
+                  "pm.test(\"Зрозуміле повідомлення\", function () {",
+                  "    pm.expect(pm.response.json().error.message).to.include(\"Токен недійсний\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/services/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "services",
+                ""
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "invalid-token",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Навіть публічний GET з поламаним токеном дає 401: фронтенд має оновити токен або прибрати його."
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Заявки про світло (лише для авторизованих)",
+      "item": [
+        {
+          "name": "❌ 401: гість дивиться заявки",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 401\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test(\"Єдиний формат помилки\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"error\");",
+                  "    pm.expect(json.error).to.have.all.keys(\"status\", \"message\", \"details\");",
+                  "});",
+                  "pm.test(\"Зрозуміле повідомлення\", function () {",
+                  "    pm.expect(pm.response.json().error.message).to.include(\"Потрібно увійти\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/power-reports/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "power-reports",
+                ""
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "❌ 401: гість подає заявку",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 401\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test(\"Єдиний формат помилки\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"error\");",
+                  "    pm.expect(json.error).to.have.all.keys(\"status\", \"message\", \"details\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/power-reports/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "power-reports",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"group\": \"2.1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Подати заявку «немає світла»",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Автор — той, хто увійшов (поле user з запиту ігнорується)\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.user).to.eql(pm.collectionVariables.get(\"user_username\"));",
+                  "    pm.collectionVariables.set(\"report_id\", json.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/power-reports/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "power-reports",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"group\": \"2.1\",\n  \"comment\": \"Немає світла з 18:00\",\n  \"user\": \"someone_else\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "❌ 400: невідома група",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Єдиний формат помилки\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"error\");",
+                  "    pm.expect(json.error).to.have.all.keys(\"status\", \"message\", \"details\");",
+                  "});",
+                  "pm.test(\"Помилка в полі group\", function () {",
+                  "    pm.expect(pm.response.json().error.details).to.have.property(\"group\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/power-reports/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "power-reports",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"group\": \"9.9\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Мої заявки",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Лише власні заявки\", function () {",
+                  "    const me = pm.collectionVariables.get(\"user_username\");",
+                  "    const results = pm.response.json().results;",
+                  "    pm.expect(results.length).to.be.above(0);",
+                  "    results.forEach(r => pm.expect(r.user).to.eql(me));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/power-reports/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "power-reports",
+                ""
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Одна заявка",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/power-reports/{{report_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "power-reports",
+                "{{report_id}}",
+                ""
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Адмін бачить усі заявки",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Серед них є заявка користувача\", function () {",
+                  "    const id = Number(pm.collectionVariables.get(\"report_id\"));",
+                  "    pm.expect(pm.response.json().results.map(r => r.id)).to.include(id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/power-reports/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "power-reports",
+                ""
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Адмін: фільтр за групою",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Лише група 2.1\", function () {",
+                  "    pm.response.json().results.forEach(r => pm.expect(r.group).to.eql(\"2.1\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/power-reports/?group=2.1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "power-reports",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "group",
+                  "value": "2.1"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Скасувати заявку",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 204\", function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/power-reports/{{report_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "power-reports",
+                "{{report_id}}",
+                ""
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "❌ 404: заявку вже видалено",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test(\"Єдиний формат помилки\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"error\");",
+                  "    pm.expect(json.error).to.have.all.keys(\"status\", \"message\", \"details\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/power-reports/{{report_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "power-reports",
+                "{{report_id}}",
+                ""
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Тривоги та таймлайн",
+      "item": [
+        {
+          "name": "Тривоги в Києві",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/alerts/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "alerts",
+                ""
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Активні тривоги",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/alerts/?active=true",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "alerts",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "active",
+                  "value": "true"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Таймлайн сервісу за 7 днів",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Є всі шари даних\", function () {",
+                  "    pm.expect(pm.response.json()).to.include.all.keys(\"service\", \"from\", \"to\", \"checks\", \"alerts\", \"outages\", \"incidents\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/services/diia/timeline/?days=7",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "services",
+                "diia",
+                "timeline",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "7"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "❌ 400: недопустимий період",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Статус 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Єдиний формат помилки\", function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property(\"error\");",
+                  "    pm.expect(json.error).to.have.all.keys(\"status\", \"message\", \"details\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/services/diia/timeline/?days=5",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "services",
+                "diia",
+                "timeline",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "5"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
       ]
     }
-  ]
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{admin_token}}",
+        "type": "string"
+      }
+    ]
+  }
 }
