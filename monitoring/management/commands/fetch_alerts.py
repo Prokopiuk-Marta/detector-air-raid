@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 import requests
@@ -6,6 +7,8 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from monitoring.models import Alert
+
+logger = logging.getLogger(__name__)
 
 API_URL = "https://api.alerts.in.ua/v1/alerts/active.json"
 KYIV_CITY_UID = "31"
@@ -18,6 +21,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         if not settings.ALERTS_IN_UA_TOKEN:
+            logger.error("Не задано ALERTS_IN_UA_TOKEN, тривоги не завантажено")
             raise CommandError("Не задано ALERTS_IN_UA_TOKEN у файлі .env.")
 
         active_alerts = self.load_kyiv_alerts()
@@ -25,6 +29,14 @@ class Command(BaseCommand):
 
         created, level_changed = self.save_active_alerts(active_alerts)
         finished = self.finish_ended_alerts(active_ids)
+
+        logger.info(
+            "Тривоги Києва: активних %s, нових %s, змінився рівень %s, завершених %s",
+            len(active_alerts),
+            created,
+            level_changed,
+            finished,
+        )
 
         if active_alerts:
             levels = ", ".join(
@@ -39,19 +51,24 @@ class Command(BaseCommand):
         )
 
     def load_kyiv_alerts(self):
+        # Токен іде лише в заголовок запиту і ніколи не потрапляє в лог.
         headers = {"Authorization": f"Bearer {settings.ALERTS_IN_UA_TOKEN}"}
         try:
             response = requests.get(API_URL, headers=headers, timeout=TIMEOUT_SECONDS)
         except requests.RequestException as error:
+            logger.error("API тривог недоступне: %s", type(error).__name__)
             raise CommandError(f"Не вдалося звернутися до API тривог: {error}")
 
         if response.status_code == 401:
+            logger.error("API тривог не прийняло токен (401)")
             raise CommandError("API тривог не прийняло токен (401). Перевірте .env.")
         if response.status_code == 429:
+            logger.warning("Забагато запитів до API тривог (429)")
             raise CommandError(
                 "Забагато запитів до API тривог (429). Спробуйте пізніше."
             )
         if not response.ok:
+            logger.error("API тривог повернуло %s", response.status_code)
             raise CommandError(f"API тривог повернуло помилку {response.status_code}.")
 
         alerts = response.json().get("alerts", [])
@@ -76,7 +93,14 @@ class Command(BaseCommand):
             )
             if created:
                 created_count += 1
+                logger.info("Почалася тривога %s (рівень %s)", saved.external_id, level)
             elif saved.alert_level != level:
+                logger.info(
+                    "Тривога %s: рівень %s -> %s",
+                    saved.external_id,
+                    saved.alert_level,
+                    level,
+                )
                 saved.alert_level = level
                 saved.save(update_fields=["alert_level"])
                 level_changed_count += 1
@@ -87,4 +111,6 @@ class Command(BaseCommand):
             finished_at__isnull=True,
             external_id__isnull=False,
         ).exclude(external_id__in=active_ids)
+        for external_id in ended.values_list("external_id", flat=True):
+            logger.info("Завершилася тривога %s", external_id)
         return ended.update(finished_at=timezone.now())

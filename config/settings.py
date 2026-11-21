@@ -14,6 +14,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -25,13 +26,32 @@ load_dotenv(BASE_DIR / ".env")
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
+
+def env_bool(name, default=False):
+    """Читає змінну середовища як True/False ("true", "1", "yes" → True)."""
+    return os.environ.get(name, str(default)).strip().lower() in {"1", "true", "yes"}
+
+
+def env_list(name, default=""):
+    """Читає список через кому: "a, b" → ["a", "b"]."""
+    return [
+        item.strip()
+        for item in os.environ.get(name, default).split(",")
+        if item.strip()
+    ]
+
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-csz#0g_+u88cb1nzqg9v5c@7!6jmj+(d3b(%12ha1a7vx2!otp"
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    raise ImproperlyConfigured(
+        "Не задано SECRET_KEY. Скопіюйте .env.example у .env і впишіть ключ."
+    )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env_bool("DEBUG", default=False)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", default="127.0.0.1,localhost")
 
 
 # Application definition
@@ -45,6 +65,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "corsheaders",
+    "drf_spectacular",
     "monitoring.apps.MonitoringConfig",
     "accounts.apps.AccountsConfig",
 ]
@@ -61,10 +82,10 @@ MIDDLEWARE = [
 ]
 
 # Allow local frontend development servers without allowing arbitrary origins.
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+CORS_ALLOWED_ORIGINS = env_list(
+    "CORS_ALLOWED_ORIGINS",
+    default="http://localhost:3000,http://127.0.0.1:3000",
+)
 
 ROOT_URLCONF = "config.urls"
 
@@ -144,6 +165,7 @@ MAILERS = {
 }
 
 REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "monitoring.exceptions.custom_exception_handler",
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -156,3 +178,47 @@ SIMPLE_JWT = {
 
 ALERTS_IN_UA_TOKEN = os.environ.get("ALERTS_IN_UA_TOKEN", "")
 UKRAINEALARM_API_KEY = os.environ.get("UKRAINEALARM_API_KEY", "")
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Detector bro API",
+    "DESCRIPTION": "Моніторинг доступності сервісів під час тривог і відключень світла в Києві.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SCHEMA_PATH_PREFIX": r"/api/v1",
+}
+
+LOG_DIR = BASE_DIR / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{asctime} [{levelname}] {name}: {message}",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+        "file": {
+            "class": "logging.FileHandler",
+            "filename": LOG_DIR / "detector.log",
+            "encoding": "utf-8",
+            "formatter": "verbose",
+        },
+    },
+    "root": {"handlers": ["console"], "level": "WARNING"},
+    "loggers": {
+        "monitoring": {"handlers": ["file"], "level": LOG_LEVEL},
+        "accounts": {"handlers": ["file"], "level": LOG_LEVEL},
+        "django.request": {"handlers": ["file"], "level": "ERROR"},
+    },
+}
